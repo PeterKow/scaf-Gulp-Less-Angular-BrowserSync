@@ -1,11 +1,17 @@
 module.exports = function() {
     var client = './public/';
     var clientApp = client + 'app/';
+    var report = './report';
     var temp = './tmp/';
     var server = './src/server/';
 
     var build = './build/';
     var bowerComponents = './bower_components/';
+    var wiredep = require('wiredep');
+    // get dev dependencies and reqular dep only js files
+    var bowerFiles = wiredep({
+        devDependencies: true
+    })['js'];
 
     var config = {
 
@@ -49,7 +55,7 @@ module.exports = function() {
         templateCache: {
             file: 'template.js',
             options: {
-                module: 'app.common',
+                module: 'app',
                 standAllone: false,
                 root: 'app/'
             }
@@ -65,6 +71,15 @@ module.exports = function() {
         ///////////////////////////////////////////////////////////////////
 
         images: client + 'images/**/*.*',
+
+
+        ///////////////////////////////////////////////////////////////////
+        //  Karma
+        ///////////////////////////////////////////////////////////////////
+
+        report: report,
+        serverIntegrationSpec: [client + 'test/server-integration/**/*.spec.js'],
+        specHelpers: [client + 'test-helpers/*.js'],
 
         ///////////////////////////////////////////////////////////////////
         //  Bower
@@ -101,5 +116,43 @@ module.exports = function() {
         return options;
     };
 
+    config.karma = getKarmaOptions();
+
     return config;
+
+
+    function getKarmaOptions() {
+        var options = {
+            files: [].concat(
+                bowerFiles,
+                // mock data etc. files
+                config.specHelpers,
+                // app files
+                clientApp + '**/*.module.js',
+                clientApp + '**/*.js',
+                // html templates
+                temp + config.templateCache.file,
+                // integration tests
+                config.serverIntegrationSpec
+            ),
+            exclusions: [],
+            coverage: {
+                dir: report + 'coverage',
+                reporters: [{
+                    type: 'html',
+                    subdir: 'report-html'
+                }, {
+                    type: 'lcov',
+                    subdir: 'report-html'
+                }, {
+                    type: 'text-summary'
+                }]
+            },
+            preprocessors: {}
+        };
+        // don't test test files
+        options.preprocessors[clientApp + '**/!(*.spec.js)+(.js)'] = ['coverage'];
+
+        return options;
+    }
 };

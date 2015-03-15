@@ -3,11 +3,11 @@
 
     angular.module('app', [
         // Angular modules
-        'app.common'
+        'app.common',
         // "ngRoute", 'app.common' //underscore"
 
         // Custom modules
-        //, 'app.searchJobs', 'app.searchEngine', 'app.searchResults'
+        'app.angular',
 
         // 3rd Party Modules
 

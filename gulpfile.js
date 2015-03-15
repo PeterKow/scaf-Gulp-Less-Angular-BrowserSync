@@ -7,6 +7,8 @@ var $ = require('gulp-load-plugins')({
 });
 var port = process.env.PORT || config.defaultPort;
 var browserSync = require('browser-sync');
+var path = require('path');
+var _ = require('lodash');
 
 /*
  * List the available gulp tasks
@@ -27,8 +29,22 @@ gulp.task('server-dev', ['inject'], function() {
 //  Server build
 ///////////////////////////////////////////////////////////////////
 
-gulp.task('server-build', ['optimize'], function() {
+gulp.task('server-build', ['build'], function() {
     serve(false);
+});
+
+///////////////////////////////////////////////////////////////////
+//  Server test
+///////////////////////////////////////////////////////////////////
+gulp.task('test', ['vet', 'templatecache'], function(done) {
+    startTests(true /* single Run */ , done);
+});
+
+///////////////////////////////////////////////////////////////////
+//  Server autotest
+///////////////////////////////////////////////////////////////////
+gulp.task('autotest', ['vet', 'templatecache'], function(done) {
+    startTests(false /* continuous Run */ , done);
 });
 
 ///////////////////////////////////////////////////////////////////
@@ -62,8 +78,23 @@ gulp.task('templatecache', ['clean-code'], function() {
 ///////////////////////////////////////////////////////////////////
 //  Optimization
 ///////////////////////////////////////////////////////////////////
+gulp.task('build', ['optimize', 'fonts', 'images'], function() {
+    log('Build everything');
+    var msg = {
+        title: 'gulp build',
+        subttitle: 'Depoloyed to the build folder',
+        message: 'Running gulp "gulp server-build"'
+    };
+    del(config.temp);
+    log(msg);
+    notify(msg);
+});
 
-gulp.task('optimize', ['inject', 'fonts', 'images'], function() {
+///////////////////////////////////////////////////////////////////
+//  Optimization
+///////////////////////////////////////////////////////////////////
+
+gulp.task('optimize', ['inject', 'test'], function() {
     log('Optimize HTML, JS, CSS');
 
     var templateCache = config.temp + config.templateCache.file;
@@ -82,7 +113,7 @@ gulp.task('optimize', ['inject', 'fonts', 'images'], function() {
         }), {
             starttag: '<!-- inject:tamplates:js -->'
         }))
-        // get all assets from index.html surrounded by <!-- build -->> 
+        // get all assets from index.html surrounded by <!-- build -->>
         .pipe(assets)
         // filter Css
         .pipe(cssFilter)
@@ -103,13 +134,13 @@ gulp.task('optimize', ['inject', 'fonts', 'images'], function() {
         // add revision number app.js --> app-2f22s2.js
         .pipe($.rev())
         .pipe(assets.restore())
-        // inject all optimized dependencies 
+        // inject all optimized dependencies
         .pipe($.useref())
         // inject new review link to html
         .pipe($.revReplace())
         .pipe(gulp.dest(config.build))
         // add manifest.json for revision
-        .pipe($.rev.manifest())
+        .pipe($.rev.manifest()).on('error', console.log)
         .pipe(gulp.dest(config.build));
 
 });
@@ -327,6 +358,30 @@ function startBrowserSync(isDev) {
 
 }
 
+function startTests(singleRun, done) {
+    var karma = require('karma').server;
+    var excludeFiles = [];
+    var serverSpecs = config.serverIntegrationSpec;
+
+    excludeFiles = serverSpecs;
+
+    karma.start({
+        configFile: __dirname + '/karma.config.js',
+        exclude: excludeFiles,
+        singleRun: !!singleRun,
+    }, karmaComplited);
+
+    function karmaComplited(karmaResult) {
+        log('Karma completed');
+        if (karma === 1) {
+            done('karma: test 1 failed with code ' + karmaResult);
+        } else {
+            done();
+        }
+    }
+
+}
+
 function log(msg) {
     if (typeof msg === 'object') {
         for (var item in msg) {
@@ -342,4 +397,15 @@ function log(msg) {
 function clean(path, done) {
     log('Cleaning: ' + $.util.colors.blue(path));
     del(path, done);
+}
+
+function notify(options) {
+    var notifier = require('node-notifier');
+    var notifyOptions = {
+        sound: 'Bottle',
+        contentImage: path.join(__dirname, 'gulp.png'),
+        icon: path.join(__dirname, 'gulp.png')
+    };
+    _.assign(notifyOptions, options);
+    notifier.notify(notifyOptions);
 }
